@@ -19,6 +19,17 @@ class DataTests(unittest.TestCase):
     def sources_copy(self):
         return {name: frame.copy() for name, frame in self.sources.items()}
 
+    def test_csv_dates_preserve_all_orders_and_registration_dates(self):
+        frame, report = app.prepare_data(self.sources_copy())
+        self.assertEqual(len(frame), 40)
+        self.assertTrue(report["rejected"].empty)
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(frame["order_date"]))
+        self.assertFalse(frame["order_date"].isna().any())
+        self.assertEqual(frame["order_date"].min(), pd.Timestamp("2024-02-01 10:15:00"))
+        self.assertEqual(frame["order_date"].max(), pd.Timestamp("2024-02-10 15:30:00"))
+        self.assertEqual(report["invalid_registration_dates"], 0)
+        self.assertFalse(frame["registration_date"].isna().any())
+
     def test_totals_against_independent_decimal_calculation(self):
         with (app.ROOT / "orders.csv").open(encoding="utf-8-sig", newline="") as source:
             rows = list(csv.DictReader(source))
@@ -122,6 +133,16 @@ class InterfaceTests(unittest.TestCase):
         ui = AppTest.from_file(str(app.ROOT / "app.py"), default_timeout=40).run()
         self.assertFalse(ui.exception)
         self.assertEqual([metric.value for metric in ui.metric], ["40", "97 541,94 ₽", "25", "2 438,55 ₽"])
+        self.assertFalse(ui.warning)
+        self.assertEqual([tab.label for tab in ui.tabs], [
+            "Ключевые показатели", "Визуализация", "Аналитические выводы", "Сырые данные"
+        ])
+        self.assertEqual([heading.value for heading in ui.tabs[1].subheader], [
+            "Топ-10 товаров по выручке", "Выручка по категориям", "Заказы по дням недели"
+        ])
+        self.assertEqual(len(ui.tabs[1].get("image")), 3)
+        findings = [item.value for item in ui.tabs[2].markdown if item.value.startswith("**")]
+        self.assertGreaterEqual(len(findings), 3)
         ui.multiselect(key="categories").set_value(["Электроника"]).run()
         self.assertFalse(ui.exception)
         self.assertEqual(ui.metric[1].value, "53 269,94 ₽")

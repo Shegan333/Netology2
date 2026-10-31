@@ -101,8 +101,13 @@ def prepare_data(sources):
                 "Исправьте конфликтующие строки справочника."
             )
 
-    orders["order_date"] = pd.to_datetime(orders["order_date"], errors="coerce", format="mixed")
-    users["registration_date"] = pd.to_datetime(users["registration_date"], errors="coerce", format="mixed")
+    # Явные форматы соответствуют CSV и работают также в Pandas до версии 2.0.
+    orders["order_date"] = pd.to_datetime(
+        orders["order_date"], format="%Y-%m-%d %H:%M:%S", errors="coerce"
+    )
+    users["registration_date"] = pd.to_datetime(
+        users["registration_date"], format="%Y-%m-%d", errors="coerce"
+    )
     orders["quantity"] = to_number(orders["quantity"])
     orders["price_per_unit"] = to_number(orders["price_per_unit"])
     items["base_price"] = to_number(items["base_price"])
